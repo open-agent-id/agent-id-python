@@ -42,30 +42,36 @@ class AgentIdentity:
         capabilities: list[str] | None = None,
         api_url: str = "https://api.openagentid.org",
         api_key: str | None = None,
+        user_token: str | None = None,
     ) -> "AgentIdentity":
         """Register a new agent identity with the registry.
 
-        The registry generates the keypair server-side.  The private key is
-        returned only once in the registration response -- store it securely.
+        Generates the Ed25519 keypair locally (BYOK). The private key never
+        leaves the client. Only the public key is sent to the registry.
 
         Args:
             name: Human-readable agent name (max 100 chars).
             capabilities: Optional list of capability strings.
             api_url: Registry API base URL.
             api_key: Platform API key for authentication.
+            user_token: Bearer token from wallet auth (alternative to api_key).
 
         Returns:
             An AgentIdentity with the private key populated.
         """
+        # Generate keypair locally — private key never leaves the client
+        priv_bytes, pub_bytes = crypto.generate_keypair()
+        public_key_b64 = crypto.base64url_encode(pub_bytes)
+
         data = await client.register_agent(
             name=name,
             capabilities=capabilities,
             api_url=api_url,
             api_key=api_key,
+            user_token=user_token,
+            public_key=public_key_b64,
         )
-        priv = crypto.base64url_decode(data["private_key"])
-        pub = crypto.base64url_decode(data["public_key"])
-        return cls(did=data["did"], private_key=priv, public_key=pub)
+        return cls(did=data["did"], private_key=priv_bytes, public_key=pub_bytes)
 
     @classmethod
     def load(cls, did: str, private_key: str) -> "AgentIdentity":

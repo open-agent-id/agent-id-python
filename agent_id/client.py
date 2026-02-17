@@ -10,6 +10,9 @@ async def register_agent(
     capabilities: list[str] | None = None,
     api_url: str = "https://api.openagentid.org",
     api_key: str | None = None,
+    user_token: str | None = None,
+    public_key: str | None = None,
+    owner_id: str | None = None,
 ) -> dict:
     """Register a new agent identity.
 
@@ -18,9 +21,14 @@ async def register_agent(
         capabilities: Optional list of capability strings.
         api_url: Base URL for the registry API.
         api_key: Platform API key for authentication.
+        user_token: Bearer token from wallet auth (alternative to api_key).
+        public_key: Base64url-encoded Ed25519 public key (BYOK mode).
+            If provided, the server will not generate a keypair.
+        owner_id: Owner wallet address (for platform-key auth).
 
     Returns:
-        Dict with keys: did, public_key, private_key, chain_status, created_at.
+        Dict with keys: did, public_key, chain_status, created_at.
+        Also includes private_key if public_key was not provided (legacy mode).
 
     Raises:
         httpx.HTTPStatusError: On non-2xx responses.
@@ -28,10 +36,16 @@ async def register_agent(
     headers: dict[str, str] = {}
     if api_key:
         headers["X-Platform-Key"] = api_key
+    elif user_token:
+        headers["Authorization"] = f"Bearer {user_token}"
 
     body: dict = {"name": name}
     if capabilities is not None:
         body["capabilities"] = capabilities
+    if public_key is not None:
+        body["public_key"] = public_key
+    if owner_id is not None:
+        body["owner_id"] = owner_id
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
