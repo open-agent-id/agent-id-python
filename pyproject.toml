@@ -9,6 +9,17 @@ description = "Python SDK for Open Agent ID — register, sign, and verify AI ag
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
+keywords = ["agent", "identity", "did", "ed25519", "verification", "ai-agent", "open-agent-id"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security :: Cryptography",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://openagentid.org"
+Repository = "https://github.com/open-agent-id/agent-id-python"
 dependencies = [
     "cryptography>=41.0",
     "httpx>=0.25",
