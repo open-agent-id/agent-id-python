@@ -1,11 +1,11 @@
-# agent-id-python
+# open-agent-id
 
 Python SDK for [Open Agent ID](../protocol/) -- register, sign, and verify AI agent identities.
 
 ## Installation
 
 ```bash
-pip install agent-id
+pip install open-agent-id
 ```
 
 Or for development:
