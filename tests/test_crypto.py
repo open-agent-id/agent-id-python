@@ -1,10 +1,10 @@
-"""Tests for the crypto module."""
+"""Tests for the crypto module (V2, using PyNaCl)."""
 
 from agent_id.crypto import (
-    generate_keypair,
-    sign,
-    verify,
-    sha256_hex,
+    generate_ed25519_keypair,
+    ed25519_sign,
+    ed25519_verify,
+    sha256,
     base64url_encode,
     base64url_decode,
     generate_nonce,
@@ -12,40 +12,38 @@ from agent_id.crypto import (
 
 
 def test_generate_keypair_sizes() -> None:
-    priv, pub = generate_keypair()
-    assert len(priv) == 64  # seed (32) + public (32)
+    priv, pub = generate_ed25519_keypair()
+    assert len(priv) == 32  # seed only
     assert len(pub) == 32
 
 
 def test_sign_verify_roundtrip() -> None:
-    priv, pub = generate_keypair()
+    priv, pub = generate_ed25519_keypair()
     message = b"hello world"
-    sig = sign(message, priv)
+    sig = ed25519_sign(priv, message)
     assert len(sig) == 64
-    assert verify(message, sig, pub) is True
+    assert ed25519_verify(pub, message, sig) is True
 
 
 def test_verify_wrong_message() -> None:
-    priv, pub = generate_keypair()
-    sig = sign(b"hello", priv)
-    assert verify(b"world", sig, pub) is False
+    priv, pub = generate_ed25519_keypair()
+    sig = ed25519_sign(priv, b"hello")
+    assert ed25519_verify(pub, b"world", sig) is False
 
 
 def test_verify_wrong_key() -> None:
-    priv1, _ = generate_keypair()
-    _, pub2 = generate_keypair()
-    sig = sign(b"hello", priv1)
-    assert verify(b"hello", sig, pub2) is False
+    priv1, _ = generate_ed25519_keypair()
+    _, pub2 = generate_ed25519_keypair()
+    sig = ed25519_sign(priv1, b"hello")
+    assert ed25519_verify(pub2, b"hello", sig) is False
 
 
-def test_sha256_hex_empty() -> None:
-    # SHA-256 of empty string is a well-known constant
-    assert sha256_hex(b"") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+def test_sha256_empty() -> None:
+    assert sha256(b"") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
-def test_sha256_hex_nonempty() -> None:
-    # Known SHA-256 value for a simple string
-    assert sha256_hex(b"test") == "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+def test_sha256_nonempty() -> None:
+    assert sha256(b"test") == "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 
 
 def test_base64url_roundtrip() -> None:
@@ -55,6 +53,11 @@ def test_base64url_roundtrip() -> None:
     assert "/" not in encoded
     assert "=" not in encoded
     assert base64url_decode(encoded) == data
+
+
+def test_base64url_empty() -> None:
+    assert base64url_encode(b"") == ""
+    assert base64url_decode("") == b""
 
 
 def test_generate_nonce_length() -> None:

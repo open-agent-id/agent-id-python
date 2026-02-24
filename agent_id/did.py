@@ -1,42 +1,42 @@
-"""DID parsing and validation for the Open Agent ID format.
+"""DID parsing and validation for Open Agent ID V2.
 
-DID format: did:agent:{platform}:{unique_id}
+DID format: did:oaid:{chain}:{agent_address}
 
-- platform: 3-20 lowercase alphanumeric characters [a-z0-9]
-- unique_id: 'agt_' followed by exactly 10 base62 characters [0-9A-Za-z]
-- Total DID length must not exceed 60 characters.
+- chain: lowercase alphanumeric chain identifier (e.g., "base")
+- agent_address: 0x + 40 hex characters (all lowercase)
 """
 
 from __future__ import annotations
 
 import re
-import secrets
-import string
 
-# Base62 character set: 0-9, A-Z, a-z
-BASE62_CHARS = string.digits + string.ascii_uppercase + string.ascii_lowercase
-
-# Pre-compiled regex for the full DID format
+# Pre-compiled regex for the V2 DID format
+# did:oaid:{chain}:{agent_address}
+# chain: 1-20 lowercase alphanumeric chars
+# agent_address: 0x + exactly 40 lowercase hex chars
 _DID_RE = re.compile(
-    r"^did:agent:([a-z0-9]{3,20}):(agt_[0-9A-Za-z]{10})$"
+    r"^did:oaid:([a-z0-9]{1,20}):(0x[0-9a-f]{40})$"
 )
 
 
 def validate_did(did: str) -> bool:
-    """Validate a DID string against the Open Agent ID format spec.
+    """Validate a DID string against the Open Agent ID V2 format spec.
 
     Returns True if valid, False otherwise.
     """
-    if not did or len(did) > 60:
+    if not did:
         return False
     return _DID_RE.match(did) is not None
 
 
-def parse_did(did: str) -> dict:
+def parse_did(did: str) -> tuple[str, str, str]:
     """Parse a DID string and extract components.
 
+    Args:
+        did: A DID string like "did:oaid:base:0x1234abcd..."
+
     Returns:
-        Dict with keys: 'method', 'platform', 'unique_id'.
+        Tuple of (method, chain, agent_address).
 
     Raises:
         ValueError: If the DID is not valid.
@@ -45,14 +45,25 @@ def parse_did(did: str) -> dict:
         raise ValueError(f"Invalid DID: {did!r}")
     m = _DID_RE.match(did)
     assert m is not None
-    return {
-        "method": "agent",
-        "platform": m.group(1),
-        "unique_id": m.group(2),
-    }
+    return ("oaid", m.group(1), m.group(2))
 
 
-def generate_unique_id() -> str:
-    """Generate a random unique ID in the format agt_ + 10 base62 chars."""
-    suffix = "".join(secrets.choice(BASE62_CHARS) for _ in range(10))
-    return f"agt_{suffix}"
+def format_did(chain: str, agent_address: str) -> str:
+    """Format components into a DID string.
+
+    Both chain and agent_address are lowercased automatically.
+
+    Args:
+        chain: Chain identifier (e.g., "base").
+        agent_address: Agent address (e.g., "0x1234...").
+
+    Returns:
+        DID string like "did:oaid:base:0x1234..."
+
+    Raises:
+        ValueError: If the resulting DID would be invalid.
+    """
+    did = f"did:oaid:{chain.lower()}:{agent_address.lower()}"
+    if not validate_did(did):
+        raise ValueError(f"Invalid DID components: chain={chain!r}, address={agent_address!r}")
+    return did

@@ -1,4 +1,7 @@
-"""Ed25519 cryptography and encoding utilities."""
+"""Low-level Ed25519 cryptography and encoding utilities.
+
+Uses PyNaCl (nacl.signing) for Ed25519 operations.
+"""
 
 from __future__ import annotations
 
@@ -6,72 +9,58 @@ import base64
 import hashlib
 import os
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-    Ed25519PrivateKey,
-    Ed25519PublicKey,
-)
-from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
-from cryptography.hazmat.primitives import serialization
+from nacl.signing import SigningKey, VerifyKey
+from nacl.exceptions import BadSignatureError
 
 
-def generate_keypair() -> tuple[bytes, bytes]:
+def generate_ed25519_keypair() -> tuple[bytes, bytes]:
     """Generate an Ed25519 keypair.
 
     Returns:
-        Tuple of (private_key_bytes, public_key_bytes) where private_key_bytes
-        is the 64-byte raw private key (seed + public) and public_key_bytes
-        is the 32-byte raw public key.
+        Tuple of (private_key_seed, public_key) where private_key_seed
+        is the 32-byte seed and public_key is the 32-byte raw public key.
     """
-    private_key = Ed25519PrivateKey.generate()
-    raw_private = private_key.private_bytes(
-        serialization.Encoding.Raw,
-        serialization.PrivateFormat.Raw,
-        serialization.NoEncryption(),
-    )
-    raw_public = private_key.public_key().public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw,
-    )
-    # Return 64-byte private key (seed || public) as used by the spec
-    return raw_private + raw_public, raw_public
+    signing_key = SigningKey.generate()
+    return bytes(signing_key), bytes(signing_key.verify_key)
 
 
-def sign(payload: bytes, private_key: bytes) -> bytes:
-    """Sign a payload with an Ed25519 private key.
+def ed25519_sign(private_key: bytes, data: bytes) -> bytes:
+    """Sign data with an Ed25519 private key.
 
     Args:
-        payload: The bytes to sign.
-        private_key: 64-byte raw private key (seed || public) or 32-byte seed.
+        private_key: 32-byte seed or 64-byte (seed || public).
+        data: The bytes to sign.
 
     Returns:
         64-byte Ed25519 signature.
     """
     seed = private_key[:32]
-    key = Ed25519PrivateKey.from_private_bytes(seed)
-    return key.sign(payload)
+    signing_key = SigningKey(seed)
+    signed = signing_key.sign(data)
+    return signed.signature
 
 
-def verify(payload: bytes, signature: bytes, public_key: bytes) -> bool:
+def ed25519_verify(public_key: bytes, data: bytes, signature: bytes) -> bool:
     """Verify an Ed25519 signature.
 
     Args:
-        payload: The bytes that were signed.
-        signature: 64-byte Ed25519 signature.
         public_key: 32-byte raw public key.
+        data: The bytes that were signed.
+        signature: 64-byte Ed25519 signature.
 
     Returns:
         True if valid, False otherwise.
     """
     try:
-        key = Ed25519PublicKey.from_public_bytes(public_key)
-        key.verify(signature, payload)
+        verify_key = VerifyKey(public_key)
+        verify_key.verify(data, signature)
         return True
-    except Exception:
+    except (BadSignatureError, Exception):
         return False
 
 
-def sha256_hex(data: bytes) -> str:
-    """Return the SHA-256 hex digest of data."""
+def sha256(data: bytes) -> str:
+    """Return the SHA-256 hex digest of data (lowercase)."""
     return hashlib.sha256(data).hexdigest()
 
 
@@ -87,7 +76,6 @@ def base64url_encode(data: bytes) -> str:
 
 def base64url_decode(s: str) -> bytes:
     """Decode a base64url string (with or without padding) to bytes."""
-    # Add back padding
     padding = 4 - len(s) % 4
     if padding != 4:
         s += "=" * padding
