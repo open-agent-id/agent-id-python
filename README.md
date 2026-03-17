@@ -95,7 +95,7 @@ did = format_did("base", "0x1234567890abcdef1234567890abcdef12345678")
 ```python
 from agent_id import RegistryClient
 
-client = RegistryClient(base_url="https://registry.openagentid.org")
+client = RegistryClient()  # defaults to https://api.openagentid.org
 ```
 
 ## Running tests
