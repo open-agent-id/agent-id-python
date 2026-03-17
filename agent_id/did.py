@@ -12,10 +12,10 @@ import re
 
 # Pre-compiled regex for the V2 DID format
 # did:oaid:{chain}:{agent_address}
-# chain: 1-20 lowercase alphanumeric chars
+# chain: 1-20 lowercase alphanumeric chars (hyphens allowed, but not at start)
 # agent_address: 0x + exactly 40 lowercase hex chars
 _DID_RE = re.compile(
-    r"^did:oaid:([a-z0-9]{1,20}):(0x[0-9a-f]{40})$"
+    r"^did:oaid:([a-z0-9][a-z0-9-]{0,19}):(0x[0-9a-f]{40})$"
 )
 
 

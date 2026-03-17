@@ -253,6 +253,52 @@ def sign_message(
         raise TypeError("Use sign_message_async for Signer objects")
 
 
+async def sign_message_async(
+    private_key_or_signer: bytes | "Signer",
+    msg_type: str,
+    msg_id: str,
+    from_did: str,
+    to_dids: list[str],
+    ref: str | None,
+    timestamp: int | None,
+    expires_at: int | None,
+    body: dict,
+    key_id: str | None = None,
+) -> bytes:
+    """Async version of sign_message supporting Signer objects.
+
+    Args:
+        private_key_or_signer: Ed25519 private key bytes or Signer instance.
+        msg_type: Message type string.
+        msg_id: Message identifier.
+        from_did: Sender DID.
+        to_dids: List of recipient DIDs.
+        ref: Optional reference to a previous message.
+        timestamp: Unix timestamp. Auto-generated if None.
+        expires_at: Optional expiration timestamp.
+        body: Message body dict.
+        key_id: Key identifier for Signer. Required when using Signer.
+
+    Returns:
+        64-byte Ed25519 signature.
+    """
+    from .signer import Signer
+
+    if timestamp is None:
+        timestamp = int(time.time())
+
+    payload = _build_message_payload(
+        msg_type, msg_id, from_did, to_dids, ref, timestamp, expires_at, body
+    )
+
+    if isinstance(private_key_or_signer, Signer):
+        if key_id is None:
+            raise ValueError("key_id is required when using Signer")
+        return await private_key_or_signer.sign(key_id, "msg", payload)
+    else:
+        return crypto.ed25519_sign(private_key_or_signer, payload)
+
+
 def verify_message_signature(
     public_key: bytes,
     msg_type: str,

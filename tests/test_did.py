@@ -14,6 +14,7 @@ VALID_DIDS = [
     "did:oaid:ethereum:0x0000000000000000000000000000000000000000",
     "did:oaid:base:0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
     "did:oaid:a:0xffffffffffffffffffffffffffffffffffffffff",
+    "did:oaid:base-sepolia:0x1234567890abcdef1234567890abcdef12345678",
 ]
 
 
@@ -37,6 +38,7 @@ INVALID_DIDS = [
     "did:oaid:base:0xgggggggggggggggggggggggggggggggggggggggg",             # invalid hex chars
     "did:other:base:0x1234567890abcdef1234567890abcdef12345678",            # wrong method
     "did:oaid::0x1234567890abcdef1234567890abcdef12345678",                 # empty chain
+    "did:oaid:-invalid:0x1234567890abcdef1234567890abcdef12345678",          # starts with hyphen
 ]
 
 

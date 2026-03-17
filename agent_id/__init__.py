@@ -9,8 +9,10 @@ from .client import RegistryClient
 from .did import parse_did, validate_did, format_did
 from .signing import (
     sign_http_request,
+    sign_http_request_async,
     verify_http_signature,
     sign_message,
+    sign_message_async,
     verify_message_signature,
     canonical_url,
     canonical_json,
@@ -32,8 +34,10 @@ __all__ = [
     "validate_did",
     "format_did",
     "sign_http_request",
+    "sign_http_request_async",
     "verify_http_signature",
     "sign_message",
+    "sign_message_async",
     "verify_message_signature",
     "canonical_url",
     "canonical_json",

@@ -1,6 +1,6 @@
 # open-agent-id
 
-Python SDK for [Open Agent ID](../protocol/) -- register, sign, and verify AI agent identities.
+Python SDK for [Open Agent ID](https://openagentid.org) -- sign and verify AI agent identities using the V2 protocol.
 
 ## Installation
 
@@ -16,58 +16,86 @@ pip install -e ".[dev]"
 
 ## Quick start
 
-### Register a new agent
+### Create an Agent and sign an HTTP request
 
 ```python
-import asyncio
-from agent_id import AgentIdentity
+from agent_id import Agent, sign_http_request, verify_http_signature
 
-async def main():
-    identity = await AgentIdentity.register(
-        name="my-search-agent",
-        capabilities=["search", "summarize"],
-        api_key="your-platform-key",
-    )
-    print(identity.did)            # did:agent:tokli:agt_...
-    print(identity.public_key_base64url)
-    # IMPORTANT: persist the private key securely -- it is only returned once.
+# Load an agent from a private key
+agent = Agent(
+    did="did:oaid:base:0x1234567890abcdef1234567890abcdef12345678",
+    private_key=b"...",  # 32-byte Ed25519 seed
+)
 
-asyncio.run(main())
+# Sign an HTTP request (oaid-http/v1 domain)
+headers = sign_http_request(
+    agent.private_key,
+    method="POST",
+    url="https://api.example.com/v1/tasks",
+    body=b'{"task":"search"}',
+)
+# headers: X-Agent-Timestamp, X-Agent-Nonce, X-Agent-Signature
 ```
 
-### Load an existing identity
+### Sign a message (agent-to-agent)
 
 ```python
-from agent_id import AgentIdentity
+from agent_id import sign_message, verify_message_signature
 
-identity = AgentIdentity.load(
-    did="did:agent:tokli:agt_a1B2c3D4e5",
-    private_key="<base64url-encoded-private-key>",
+# Sign a P2P message (oaid-msg/v1 domain)
+signature = sign_message(
+    private_key,
+    msg_type="request",
+    msg_id="msg-001",
+    from_did="did:oaid:base:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    to_dids=["did:oaid:base:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+    ref=None,
+    timestamp=None,  # auto-generated
+    expires_at=None,
+    body={"task": "summarize", "url": "https://example.com"},
 )
 ```
 
-### Sign an HTTP request
+### Async signing with the Signer daemon
 
 ```python
-headers = identity.sign_request("POST", "https://api.example.com/v1/tasks", '{"task":"search"}')
-# headers contains X-Agent-DID, X-Agent-Timestamp, X-Agent-Nonce, X-Agent-Signature
-```
+from agent_id import sign_http_request_async, sign_message_async, Signer
 
-### Verify another agent's signature
+signer = Signer(socket_path="/tmp/oaid-signer.sock")
 
-```python
-valid = await AgentIdentity.verify(
-    did="did:agent:other:agt_X9yZ8wV7u6",
-    payload=canonical_payload,
-    signature=signature_b64,
+# Async HTTP request signing
+headers = await sign_http_request_async(
+    signer, method="GET", url="https://api.example.com/data", body=None, key_id="key-1"
+)
+
+# Async message signing
+sig = await sign_message_async(
+    signer, msg_type="request", msg_id="msg-002",
+    from_did="did:oaid:base:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    to_dids=["did:oaid:base:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+    ref=None, timestamp=None, expires_at=None, body={"hello": "world"}, key_id="key-1",
 )
 ```
 
-### Look up an agent
+### DID utilities
 
 ```python
-info = await AgentIdentity.lookup("did:agent:tokli:agt_a1B2c3D4e5")
-print(info["name"], info["status"])
+from agent_id import validate_did, parse_did, format_did
+
+validate_did("did:oaid:base-sepolia:0x1234567890abcdef1234567890abcdef12345678")  # True
+
+method, chain, address = parse_did("did:oaid:base:0x1234567890abcdef1234567890abcdef12345678")
+# ("oaid", "base", "0x1234...")
+
+did = format_did("base", "0x1234567890abcdef1234567890abcdef12345678")
+```
+
+### Registry client
+
+```python
+from agent_id import RegistryClient
+
+client = RegistryClient(base_url="https://registry.openagentid.org")
 ```
 
 ## Running tests
