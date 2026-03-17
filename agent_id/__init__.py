@@ -24,6 +24,10 @@ from .crypto import (
     base64url_encode,
     base64url_decode,
     sha256,
+    ed25519_to_x25519_public,
+    ed25519_to_x25519_private,
+    encrypt_for,
+    decrypt_from,
 )
 
 __all__ = [
@@ -47,5 +51,9 @@ __all__ = [
     "base64url_encode",
     "base64url_decode",
     "sha256",
+    "ed25519_to_x25519_public",
+    "ed25519_to_x25519_private",
+    "encrypt_for",
+    "decrypt_from",
 ]
 __version__ = "0.2.0"

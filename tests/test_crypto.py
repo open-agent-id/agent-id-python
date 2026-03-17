@@ -1,5 +1,7 @@
 """Tests for the crypto module (V2, using PyNaCl)."""
 
+import pytest
+
 from agent_id.crypto import (
     generate_ed25519_keypair,
     ed25519_sign,
@@ -8,6 +10,10 @@ from agent_id.crypto import (
     base64url_encode,
     base64url_decode,
     generate_nonce,
+    ed25519_to_x25519_public,
+    ed25519_to_x25519_private,
+    encrypt_for,
+    decrypt_from,
 )
 
 
@@ -64,3 +70,53 @@ def test_generate_nonce_length() -> None:
     nonce = generate_nonce()
     assert len(nonce) == 32  # 16 bytes = 32 hex chars
     int(nonce, 16)  # should be valid hex
+
+
+# ---------------------------------------------------------------------------
+# E2E encryption tests
+# ---------------------------------------------------------------------------
+
+
+def test_key_conversion_deterministic() -> None:
+    priv, pub = generate_ed25519_keypair()
+    assert ed25519_to_x25519_public(pub) == ed25519_to_x25519_public(pub)
+    assert ed25519_to_x25519_private(priv) == ed25519_to_x25519_private(priv)
+    assert len(ed25519_to_x25519_public(pub)) == 32
+    assert len(ed25519_to_x25519_private(priv)) == 32
+
+
+def test_encrypt_decrypt_roundtrip() -> None:
+    sender_priv, sender_pub = generate_ed25519_keypair()
+    recipient_priv, recipient_pub = generate_ed25519_keypair()
+
+    plaintext = b"hello agent world"
+    ciphertext = encrypt_for(plaintext, recipient_pub, sender_priv)
+
+    # Ciphertext should be nonce (24) + MAC (16) + plaintext length
+    assert len(ciphertext) == 24 + 16 + len(plaintext)
+
+    decrypted = decrypt_from(ciphertext, sender_pub, recipient_priv)
+    assert decrypted == plaintext
+
+
+def test_decrypt_with_wrong_key_fails() -> None:
+    sender_priv, sender_pub = generate_ed25519_keypair()
+    _, recipient_pub = generate_ed25519_keypair()
+    wrong_priv, _ = generate_ed25519_keypair()
+
+    plaintext = b"secret message"
+    ciphertext = encrypt_for(plaintext, recipient_pub, sender_priv)
+
+    from nacl.exceptions import CryptoError
+
+    with pytest.raises(CryptoError):
+        decrypt_from(ciphertext, sender_pub, wrong_priv)
+
+
+def test_encrypt_empty_message() -> None:
+    sender_priv, sender_pub = generate_ed25519_keypair()
+    recipient_priv, recipient_pub = generate_ed25519_keypair()
+
+    ciphertext = encrypt_for(b"", recipient_pub, sender_priv)
+    decrypted = decrypt_from(ciphertext, sender_pub, recipient_priv)
+    assert decrypted == b""
