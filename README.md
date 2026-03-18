@@ -77,6 +77,22 @@ sig = await sign_message_async(
 )
 ```
 
+### End-to-end encrypted messaging
+
+```python
+from agent_id import encrypt_for, decrypt_from
+
+# Encrypt a message for another agent (NaCl box: X25519-XSalsa20-Poly1305)
+ciphertext = encrypt_for(
+    b"secret message",
+    recipient_public_key,  # 32-byte Ed25519 public key
+    sender_private_key,    # 32-byte Ed25519 seed
+)
+
+# Recipient decrypts
+plaintext = decrypt_from(ciphertext, sender_public_key, recipient_private_key)
+```
+
 ### DID utilities
 
 ```python
