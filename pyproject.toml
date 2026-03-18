@@ -30,7 +30,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://openagentid.org"
-Repository = "https://github.com/openagentid/agent-id-python"
+Repository = "https://github.com/open-agent-id/agent-id-python"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent_id"]
