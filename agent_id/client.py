@@ -64,7 +64,7 @@ class RegistryClient:
         """
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{self._base_url}/v1/auth/verify",
+                f"{self._base_url}/v1/auth/wallet",
                 json={
                     "wallet_address": wallet_address,
                     "challenge_id": challenge_id,
