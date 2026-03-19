@@ -128,21 +128,21 @@ class RegistryClient:
 
     async def list_agents(
         self,
-        owner: str,
+        token: str,
         limit: int = 20,
         cursor: str | None = None,
     ) -> dict:
-        """List agents owned by a wallet address.
+        """List agents owned by the authenticated wallet.
 
         Args:
-            owner: Wallet address of the owner.
+            token: Bearer token from wallet auth (oaid_...).
             limit: Maximum number of results (default 20).
             cursor: Pagination cursor.
 
         Returns:
             Dict with agents list and next_cursor.
         """
-        params: dict = {"owner": owner, "limit": limit}
+        params: dict = {"limit": limit}
         if cursor is not None:
             params["cursor"] = cursor
 
@@ -150,6 +150,7 @@ class RegistryClient:
             resp = await client.get(
                 f"{self._base_url}/v1/agents",
                 params=params,
+                headers={"Authorization": f"Bearer {token}"},
             )
             resp.raise_for_status()
             return resp.json()
