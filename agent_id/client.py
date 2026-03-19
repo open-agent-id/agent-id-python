@@ -20,10 +20,32 @@ class RegistryClient:
 
     Provides methods for wallet authentication, agent management,
     and signature verification.
+
+    Can be used as an async context manager::
+
+        async with RegistryClient() as client:
+            info = await client.get_agent("did:oaid:...")
     """
 
-    def __init__(self, base_url: str = "https://api.openagentid.org") -> None:
+    def __init__(
+        self,
+        base_url: str = "https://api.openagentid.org",
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
+        self._client = client or httpx.AsyncClient()
+        self._owns_client = client is None
+
+    async def close(self) -> None:
+        """Close the underlying HTTP client (only if we own it)."""
+        if self._owns_client:
+            await self._client.aclose()
+
+    async def __aenter__(self) -> RegistryClient:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.close()
 
     # ------------------------------------------------------------------
     # Auth
@@ -38,13 +60,12 @@ class RegistryClient:
         Returns:
             Dict with challenge_id and message to sign.
         """
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self._base_url}/v1/auth/challenge",
-                json={"wallet_address": wallet_address},
-            )
-            resp.raise_for_status()
-            return resp.json()
+        resp = await self._client.post(
+            f"{self._base_url}/v1/auth/challenge",
+            json={"wallet_address": wallet_address},
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def verify_wallet(
         self,
@@ -62,18 +83,17 @@ class RegistryClient:
         Returns:
             Bearer token string (oaid_...).
         """
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self._base_url}/v1/auth/wallet",
-                json={
-                    "wallet_address": wallet_address,
-                    "challenge_id": challenge_id,
-                    "signature": signature,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data["token"]
+        resp = await self._client.post(
+            f"{self._base_url}/v1/auth/wallet",
+            json={
+                "wallet_address": wallet_address,
+                "challenge_id": challenge_id,
+                "signature": signature,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["token"]
 
     # ------------------------------------------------------------------
     # Agent management
@@ -103,14 +123,13 @@ class RegistryClient:
         if public_key is not None:
             body["public_key"] = public_key
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self._base_url}/v1/agents",
-                json=body,
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            resp.raise_for_status()
-            return resp.json()
+        resp = await self._client.post(
+            f"{self._base_url}/v1/agents",
+            json=body,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def get_agent(self, did: str) -> dict:
         """Look up an agent by DID.
@@ -121,10 +140,9 @@ class RegistryClient:
         Returns:
             Dict with agent info.
         """
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{self._base_url}/v1/agents/{did}")
-            resp.raise_for_status()
-            return resp.json()
+        resp = await self._client.get(f"{self._base_url}/v1/agents/{did}")
+        resp.raise_for_status()
+        return resp.json()
 
     async def list_agents(
         self,
@@ -146,14 +164,13 @@ class RegistryClient:
         if cursor is not None:
             params["cursor"] = cursor
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{self._base_url}/v1/agents",
-                params=params,
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            resp.raise_for_status()
-            return resp.json()
+        resp = await self._client.get(
+            f"{self._base_url}/v1/agents",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def update_agent(
         self,
@@ -193,14 +210,13 @@ class RegistryClient:
             headers.update(sig_headers)
             headers["X-Agent-DID"] = did
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.patch(
-                f"{self._base_url}/v1/agents/{did}",
-                json=dict(updates) if updates else {},
-                headers=headers,
-            )
-            resp.raise_for_status()
-            return resp.json()
+        resp = await self._client.patch(
+            f"{self._base_url}/v1/agents/{did}",
+            json=dict(updates) if updates else {},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def revoke_agent(self, did: str, token: str) -> None:
         """Revoke an agent.
@@ -209,12 +225,11 @@ class RegistryClient:
             did: The agent DID to revoke.
             token: Bearer token for wallet auth.
         """
-        async with httpx.AsyncClient() as client:
-            resp = await client.delete(
-                f"{self._base_url}/v1/agents/{did}",
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            resp.raise_for_status()
+        resp = await self._client.delete(
+            f"{self._base_url}/v1/agents/{did}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
 
     # ------------------------------------------------------------------
     # Credit
@@ -231,10 +246,9 @@ class RegistryClient:
         Returns:
             Dict with credit score info.
         """
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{self._base_url}/v1/credit/{did}")
-            resp.raise_for_status()
-            return resp.json()
+        resp = await self._client.get(f"{self._base_url}/v1/credit/{did}")
+        resp.raise_for_status()
+        return resp.json()
 
     # ------------------------------------------------------------------
     # Verification
@@ -258,15 +272,14 @@ class RegistryClient:
         Returns:
             True if valid, False otherwise.
         """
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self._base_url}/v1/verify",
-                json={
-                    "did": did,
-                    "domain": domain,
-                    "payload": payload,
-                    "signature": signature,
-                },
-            )
-            resp.raise_for_status()
-            return resp.json().get("valid", False)
+        resp = await self._client.post(
+            f"{self._base_url}/v1/verify",
+            json={
+                "did": did,
+                "domain": domain,
+                "payload": payload,
+                "signature": signature,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json().get("valid", False)
