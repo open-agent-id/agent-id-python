@@ -217,6 +217,26 @@ class RegistryClient:
             resp.raise_for_status()
 
     # ------------------------------------------------------------------
+    # Credit
+    # ------------------------------------------------------------------
+
+    async def get_credit(self, did: str) -> dict:
+        """Get an agent's credit score.
+
+        Public endpoint, no auth required.
+
+        Args:
+            did: The agent DID string.
+
+        Returns:
+            Dict with credit score info.
+        """
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{self._base_url}/v1/credit/{did}")
+            resp.raise_for_status()
+            return resp.json()
+
+    # ------------------------------------------------------------------
     # Verification
     # ------------------------------------------------------------------
 
