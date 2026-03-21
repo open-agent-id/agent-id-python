@@ -14,22 +14,108 @@ Or for development:
 pip install -e ".[dev]"
 ```
 
-## Quick start
+## Quick Start
 
-### Create an Agent and sign an HTTP request
+The most common use case is adding agent authentication headers to outbound requests:
 
 ```python
-from agent_id import Agent, sign_http_request, verify_http_signature
+from agent_id import sign_agent_auth
 
-# Load an agent from a private key
-agent = Agent(
-    did="did:oaid:base:0x1234567890abcdef1234567890abcdef12345678",
-    private_key=b"...",  # 32-byte Ed25519 seed
+headers = sign_agent_auth(
+    "did:oaid:base:0x1234567890abcdef1234567890abcdef12345678",
+    private_key,  # 32-byte Ed25519 seed
 )
+# Returns dict with:
+#   "X-Agent-DID":       "did:oaid:base:0x1234..."
+#   "X-Agent-Timestamp": "1708123456"
+#   "X-Agent-Nonce":     "a3f1b2c4d5e6f7089012abcd"
+#   "X-Agent-Signature": "<base64url signature>"
 
-# Sign an HTTP request (oaid-http/v1 domain)
+import httpx
+resp = httpx.post("https://api.example.com/v1/tasks", headers=headers, json={"task": "search"})
+```
+
+## Registry Client
+
+```python
+from agent_id import RegistryClient
+
+client = RegistryClient()  # defaults to https://api.openagentid.org
+```
+
+### All methods
+
+| Method | Auth required | Description |
+|---|---|---|
+| `client.challenge(wallet_address)` | No | Request a wallet auth challenge |
+| `client.verify_wallet(wallet_address, challenge_id, signature)` | No | Verify wallet signature, returns auth token |
+| `client.register_agent(token, agent_data)` | Yes | Register a new agent (accepts optional `referred_by` DID) |
+| `client.get_agent(did)` | No | Look up an agent by DID |
+| `client.list_agents(token)` | Yes | List agents owned by the authenticated wallet |
+| `client.update_agent(token, did, updates)` | Yes | Update agent metadata |
+| `client.revoke_agent(token, did)` | Yes | Revoke an agent identity |
+| `client.rotate_key(token, did, new_public_key)` | Yes | Rotate an agent's public key |
+| `client.deploy_wallet(token, did)` | Yes | Deploy an on-chain smart wallet for an agent |
+| `client.get_credit(did)` | No | Look up an agent's credit score |
+| `client.verify_signature(did, signature, payload)` | No | Verify a signature against the agent's registered key |
+
+### Wallet auth flow
+
+```python
+# 1. Request challenge
+challenge = await client.challenge(wallet_address)
+
+# 2. Sign the challenge text with your wallet (e.g. via web3.py)
+# wallet_signature = ...
+
+# 3. Verify and get auth token
+token = await client.verify_wallet(wallet_address, challenge["challenge_id"], wallet_signature)
+```
+
+### Register an agent
+
+```python
+agent = await client.register_agent(token, {
+    "name": "my-agent",
+    "capabilities": ["search", "summarize"],
+    "public_key": base64url_public_key,
+    "referred_by": "did:oaid:base:0xaaaa...",  # optional referral
+})
+```
+
+### Look up and list agents
+
+```python
+info = await client.get_agent("did:oaid:base:0x1234...")
+agents = await client.list_agents(token)
+```
+
+### Manage agents
+
+```python
+await client.update_agent(token, did, {"name": "new-name"})
+await client.rotate_key(token, did, new_public_key)
+await client.revoke_agent(token, did)
+await client.deploy_wallet(token, did)
+```
+
+## Credit Score
+
+```python
+credit = await client.get_credit("did:oaid:base:0x1234567890abcdef1234567890abcdef12345678")
+print(credit["credit_score"])  # 300
+print(credit["level"])         # "verified"
+```
+
+## HTTP Signing
+
+### Sign an HTTP request
+
+```python
+from agent_id import sign_http_request, verify_http_signature
+
 headers = sign_http_request(
-    agent.private_key,
+    private_key,
     method="POST",
     url="https://api.example.com/v1/tasks",
     body=b'{"task":"search"}',
@@ -37,12 +123,33 @@ headers = sign_http_request(
 # headers: X-Agent-Timestamp, X-Agent-Nonce, X-Agent-Signature
 ```
 
-### Sign a message (agent-to-agent)
+### Verify an HTTP signature
+
+```python
+valid = verify_http_signature(
+    public_key, method="POST", url=url, body=body,
+    timestamp=timestamp, nonce=nonce, signature=signature,
+)
+```
+
+### Async signing with the Signer daemon
+
+```python
+from agent_id import sign_http_request_async, Signer
+
+signer = Signer(socket_path="/tmp/oaid-signer.sock")
+headers = await sign_http_request_async(
+    signer, method="GET", url="https://api.example.com/data", body=None, key_id="key-1"
+)
+```
+
+## Message Signing
+
+### Sign a P2P message
 
 ```python
 from agent_id import sign_message, verify_message_signature
 
-# Sign a P2P message (oaid-msg/v1 domain)
 signature = sign_message(
     private_key,
     msg_type="request",
@@ -56,19 +163,11 @@ signature = sign_message(
 )
 ```
 
-### Async signing with the Signer daemon
+### Async message signing
 
 ```python
-from agent_id import sign_http_request_async, sign_message_async, Signer
+from agent_id import sign_message_async
 
-signer = Signer(socket_path="/tmp/oaid-signer.sock")
-
-# Async HTTP request signing
-headers = await sign_http_request_async(
-    signer, method="GET", url="https://api.example.com/data", body=None, key_id="key-1"
-)
-
-# Async message signing
 sig = await sign_message_async(
     signer, msg_type="request", msg_id="msg-002",
     from_did="did:oaid:base:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -77,7 +176,7 @@ sig = await sign_message_async(
 )
 ```
 
-### End-to-end encrypted messaging
+## E2E Encryption
 
 ```python
 from agent_id import encrypt_for, decrypt_from
@@ -93,7 +192,7 @@ ciphertext = encrypt_for(
 plaintext = decrypt_from(ciphertext, sender_public_key, recipient_private_key)
 ```
 
-### DID utilities
+## DID Utilities
 
 ```python
 from agent_id import validate_did, parse_did, format_did
@@ -106,15 +205,7 @@ method, chain, address = parse_did("did:oaid:base:0x1234567890abcdef1234567890ab
 did = format_did("base", "0x1234567890abcdef1234567890abcdef12345678")
 ```
 
-### Registry client
-
-```python
-from agent_id import RegistryClient
-
-client = RegistryClient()  # defaults to https://api.openagentid.org
-```
-
-## Running tests
+## Testing
 
 ```bash
 pip install -e ".[dev]"
@@ -123,4 +214,4 @@ pytest
 
 ## License
 
-Apache 2.0 -- see [LICENSE](LICENSE).
+Apache-2.0 -- see [LICENSE](LICENSE).
