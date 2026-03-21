@@ -47,23 +47,23 @@ client = RegistryClient()  # defaults to https://api.openagentid.org
 
 | Method | Auth required | Description |
 |---|---|---|
-| `client.challenge(wallet_address)` | No | Request a wallet auth challenge |
+| `client.request_challenge(wallet_address)` | No | Request a wallet auth challenge |
 | `client.verify_wallet(wallet_address, challenge_id, signature)` | No | Verify wallet signature, returns auth token |
-| `client.register_agent(token, agent_data)` | Yes | Register a new agent (accepts optional `referred_by` DID) |
+| `client.register_agent(token, name, public_key, capabilities=None)` | Yes | Register a new agent |
 | `client.get_agent(did)` | No | Look up an agent by DID |
-| `client.list_agents(token)` | Yes | List agents owned by the authenticated wallet |
-| `client.update_agent(token, did, updates)` | Yes | Update agent metadata |
-| `client.revoke_agent(token, did)` | Yes | Revoke an agent identity |
-| `client.rotate_key(token, did, new_public_key)` | Yes | Rotate an agent's public key |
-| `client.deploy_wallet(token, did)` | Yes | Deploy an on-chain smart wallet for an agent |
+| `client.list_agents(token, limit=20, cursor=None)` | Yes | List agents owned by the authenticated wallet |
+| `client.update_agent(did, token=None, agent_signer=None, **updates)` | Yes | Update agent metadata |
+| `client.revoke_agent(did, token)` | Yes | Revoke an agent identity |
+| `client.rotate_key(did, token, public_key)` | Yes | Rotate an agent's public key |
+| `client.deploy_wallet(did, token)` | Yes | Deploy an on-chain smart wallet for an agent |
 | `client.get_credit(did)` | No | Look up an agent's credit score |
-| `client.verify_signature(did, signature, payload)` | No | Verify a signature against the agent's registered key |
+| `client.verify_signature(did, domain, payload, signature)` | No | Verify a signature against the agent's registered key |
 
 ### Wallet auth flow
 
 ```python
 # 1. Request challenge
-challenge = await client.challenge(wallet_address)
+challenge = await client.request_challenge(wallet_address)
 
 # 2. Sign the challenge text with your wallet (e.g. via web3.py)
 # wallet_signature = ...
@@ -75,12 +75,12 @@ token = await client.verify_wallet(wallet_address, challenge["challenge_id"], wa
 ### Register an agent
 
 ```python
-agent = await client.register_agent(token, {
-    "name": "my-agent",
-    "capabilities": ["search", "summarize"],
-    "public_key": base64url_public_key,
-    "referred_by": "did:oaid:base:0xaaaa...",  # optional referral
-})
+agent = await client.register_agent(
+    token,
+    name="my-agent",
+    public_key=base64url_public_key,
+    capabilities=["search", "summarize"],
+)
 ```
 
 ### Look up and list agents
@@ -93,10 +93,10 @@ agents = await client.list_agents(token)
 ### Manage agents
 
 ```python
-await client.update_agent(token, did, {"name": "new-name"})
-await client.rotate_key(token, did, new_public_key)
-await client.revoke_agent(token, did)
-await client.deploy_wallet(token, did)
+await client.update_agent(did, token=token, name="new-name")
+await client.rotate_key(did, token, new_public_key)
+await client.revoke_agent(did, token)
+await client.deploy_wallet(did, token)
 ```
 
 ## Credit Score
