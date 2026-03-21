@@ -216,6 +216,42 @@ class RegistryClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def rotate_key(self, did: str, token: str, public_key: str) -> dict:
+        """Rotate an agent's Ed25519 public key. Requires wallet auth.
+
+        Args:
+            did: The agent DID whose key to rotate.
+            token: Bearer token from wallet auth (oaid_...).
+            public_key: New base64url-encoded Ed25519 public key.
+
+        Returns:
+            Dict with updated agent info.
+        """
+        resp = await self._client.put(
+            f"{self._base_url}/v1/agents/{did}/key",
+            json={"public_key": public_key},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def deploy_wallet(self, did: str, token: str) -> dict:
+        """Deploy the agent's smart contract wallet. Requires wallet auth.
+
+        Args:
+            did: The agent DID whose wallet to deploy.
+            token: Bearer token from wallet auth (oaid_...).
+
+        Returns:
+            Dict with wallet deployment info.
+        """
+        resp = await self._client.post(
+            f"{self._base_url}/v1/agents/{did}/deploy-wallet",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     async def revoke_agent(self, did: str, token: str) -> None:
         """Revoke an agent.
 
