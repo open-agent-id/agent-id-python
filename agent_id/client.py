@@ -103,25 +103,23 @@ class RegistryClient:
         self,
         token: str,
         name: str,
+        public_key: str,
         capabilities: list[str] | None = None,
-        public_key: str | None = None,
     ) -> dict:
         """Register a new agent.
 
         Args:
             token: Bearer token from wallet auth (oaid_...).
             name: Agent name (max 100 characters).
+            public_key: Base64url-encoded Ed25519 public key (required).
             capabilities: Optional list of capability strings.
-            public_key: Base64url-encoded Ed25519 public key.
 
         Returns:
             Dict with agent info including did, public_key, etc.
         """
-        body: dict = {"name": name}
+        body: dict = {"name": name, "public_key": public_key}
         if capabilities is not None:
             body["capabilities"] = capabilities
-        if public_key is not None:
-            body["public_key"] = public_key
 
         resp = await self._client.post(
             f"{self._base_url}/v1/agents",
@@ -199,10 +197,10 @@ class RegistryClient:
 
         if agent_signer is not None:
             from .signing import sign_http_request
-            from . import crypto
+            from . import crypto, signing
 
             signer_or_key, key_id = agent_signer
-            body_bytes = crypto.canonical_json(dict(updates)) if updates else b"{}"
+            body_bytes = signing.canonical_json(dict(updates)) if updates else b"{}"
             url = f"{self._base_url}/v1/agents/{did}"
             sig_headers = sign_http_request(
                 signer_or_key, "PATCH", url, body_bytes,

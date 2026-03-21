@@ -8,6 +8,8 @@ from .signer import Signer
 from .client import RegistryClient
 from .did import parse_did, validate_did, format_did
 from .signing import (
+    sign_agent_auth,
+    verify_agent_auth,
     sign_http_request,
     sign_http_request_async,
     verify_http_signature,
@@ -37,6 +39,8 @@ __all__ = [
     "parse_did",
     "validate_did",
     "format_did",
+    "sign_agent_auth",
+    "verify_agent_auth",
     "sign_http_request",
     "sign_http_request_async",
     "verify_http_signature",

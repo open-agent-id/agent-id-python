@@ -62,6 +62,68 @@ def canonical_json(obj: dict) -> bytes:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def sign_agent_auth(
+    did: str,
+    private_key: bytes,
+    timestamp: int | None = None,
+    nonce: str | None = None,
+) -> dict[str, str]:
+    """Sign agent authentication headers for the registry API.
+
+    Uses the simple payload format: {did}\\n{timestamp}\\n{nonce}
+
+    Args:
+        did: The agent's DID string.
+        private_key: 32-byte Ed25519 private key seed.
+        timestamp: Unix timestamp. Auto-generated if None.
+        nonce: Hex nonce. Auto-generated if None.
+
+    Returns:
+        Dict of HTTP headers: X-Agent-DID, X-Agent-Timestamp, X-Agent-Nonce,
+        X-Agent-Signature.
+    """
+    if timestamp is None:
+        timestamp = int(time.time())
+    if nonce is None:
+        nonce = crypto.generate_nonce()
+
+    payload = f"{did}\n{timestamp}\n{nonce}".encode("utf-8")
+    signature = crypto.ed25519_sign(private_key, payload)
+
+    return {
+        "X-Agent-DID": did,
+        "X-Agent-Timestamp": str(timestamp),
+        "X-Agent-Nonce": nonce,
+        "X-Agent-Signature": crypto.base64url_encode(signature),
+    }
+
+
+def verify_agent_auth(
+    public_key: bytes,
+    did: str,
+    timestamp: int,
+    nonce: str,
+    signature: bytes,
+) -> bool:
+    """Verify agent authentication headers from the registry API.
+
+    Reconstructs the simple payload {did}\\n{timestamp}\\n{nonce} and verifies
+    the Ed25519 signature. Does *not* check timestamp freshness.
+
+    Args:
+        public_key: 32-byte Ed25519 public key.
+        did: The agent's DID string.
+        timestamp: Unix timestamp from the request.
+        nonce: Hex nonce from the request.
+        signature: 64-byte Ed25519 signature.
+
+    Returns:
+        True if valid, False otherwise.
+    """
+    payload = f"{did}\n{timestamp}\n{nonce}".encode("utf-8")
+    return crypto.ed25519_verify(public_key, payload, signature)
+
+
 def _build_http_payload(
     method: str,
     url: str,
